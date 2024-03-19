@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -16,13 +17,12 @@ import (
 // getting auth token
 var authCodeChan = make(chan string)
 
-func GetAuthCode(client_id string, redirect_uri string, scopes []string) string {
+func GetAuthCode(client_id string, redirect_uri string, scopes []string) (string, error) {
 	auth_code_url := "https://accounts.spotify.com/authorize?response_type=code&client_id=" + client_id + "&scope=" + strings.Join(scopes, " ") + "&redirect_uri=" + redirect_uri
 
 	err := openBrowser(auth_code_url)
 	if err != nil {
-		fmt.Printf("Could not open browser: %v\n", err)
-		return ""
+		return "", err
 	}
 
 	http.HandleFunc("/callback", handleCallback)
@@ -30,7 +30,7 @@ func GetAuthCode(client_id string, redirect_uri string, scopes []string) string 
 
 	code := getCode()
 
-	return code
+	return code, nil
 }
 
 // check os and open browser, returns err
@@ -78,7 +78,7 @@ type Response struct {
 }
 
 // getting refresh token
-func GetRefreshToken(client_id string, client_secret string, redirect_uri string, auth_code string) string {
+func GetRefreshToken(client_id string, client_secret string, redirect_uri string, auth_code string) (string, error) {
 	// b64 encode
 	auth := client_id + ":" + client_secret
 	encoded_auth := base64.StdEncoding.EncodeToString([]byte(auth))
@@ -94,8 +94,7 @@ func GetRefreshToken(client_id string, client_secret string, redirect_uri string
 	client := http.Client{}
 	req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", req_body)
 	if err != nil {
-		fmt.Printf("Error initializing request to refresh token: %v\n", err)
-		return ""
+		return "", err
 	}
 	// headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -104,24 +103,34 @@ func GetRefreshToken(client_id string, client_secret string, redirect_uri string
 	// execute request
 	res, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Error executing request to get refresh token: %v\n", err)
-		return ""
+		return "", err
 	}
 
 	// read request
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		fmt.Printf("Error reading response body: %v\n", err)
-		return ""
+		return "", err
 	}
 
 	// parse json
 	var data Response
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		fmt.Printf("Error parsing json: %v\n", err)
-		return ""
+		return "", err
 	}
 
-	return data.Refresh_token
+	return data.Refresh_token, nil
+}
+
+func WriteToEnv(refresh_token string) error {
+	data := "SPOTIFY_REFRESH_TOKEN=" + refresh_token
+	f, err := os.OpenFile("./.env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.WriteString(data); err != nil {
+		return err
+	}
+	return nil
 }

@@ -33,11 +33,25 @@ func main() {
 		redirect_uri := "http://localhost:8888/callback"
 
 		// get auth code
-		auth_code := auth.GetAuthCode(client_id, redirect_uri, scopes)
+		auth_code, err := auth.GetAuthCode(client_id, redirect_uri, scopes)
+		if err != nil {
+			fmt.Printf("Error getting auth code: %v\n", err)
+			return
+		}
 
 		// get refresh token
-		refresh_token := auth.GetRefreshToken(client_id, client_secret, redirect_uri, auth_code)
-		fmt.Println("Refresh token: ", refresh_token)
-	}
+		refresh_token, err = auth.GetRefreshToken(client_id, client_secret, redirect_uri, auth_code)
+		if err != nil {
+			fmt.Printf("Error getting refresh token: %v\n", err)
+			return
+		}
 
+		// write the refresh token to env
+		err = auth.WriteToEnv(refresh_token)
+		if err != nil {
+			fmt.Printf("Error writing to env file: %v\n", err)
+			return
+		}
+	}
+	fmt.Println("You are authorized:", refresh_token)
 }
