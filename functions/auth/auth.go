@@ -69,7 +69,7 @@ func getCode() string {
 	}
 }
 
-type Response struct {
+type RefreshToken struct {
 	Access_token  string `json:"access_token"`
 	Token_type    string `json:"token_type"`
 	Scope         string `json:"scope"`
@@ -106,6 +106,8 @@ func GetRefreshToken(client_id string, client_secret string, redirect_uri string
 		return "", err
 	}
 
+	defer res.Body.Close()
+
 	// read request
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -113,7 +115,7 @@ func GetRefreshToken(client_id string, client_secret string, redirect_uri string
 	}
 
 	// parse json
-	var data Response
+	var data RefreshToken
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return "", err
@@ -133,4 +135,51 @@ func WriteToEnv(refresh_token string) error {
 		return err
 	}
 	return nil
+}
+
+type AccessToken struct {
+	Access_token string `json:"access_token"`
+}
+
+func GetAccessToken(client_id string, client_secret string, refresh_token string) (string, error) {
+	auth := client_id + ":" + client_secret
+	encoded_auth := base64.StdEncoding.EncodeToString([]byte(auth))
+
+	// body
+	req_body_data := url.Values{}
+	req_body_data.Set("grant_type", "refresh_token")
+	req_body_data.Set("refresh_token", refresh_token)
+	req_body := strings.NewReader(req_body_data.Encode())
+
+	client := http.Client{}
+	req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", req_body)
+	if err != nil {
+		return "", err
+	}
+	// headers
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Basic "+encoded_auth)
+
+	// execute request
+	res, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer res.Body.Close()
+
+	// read request
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// parse json
+	var data AccessToken
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return "", err
+	}
+
+	return data.Access_token, nil
 }
