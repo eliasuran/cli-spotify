@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/eliasuran/cli-spotify/functions/structs"
 )
 
 // getting auth token
@@ -137,11 +139,7 @@ func WriteToEnv(refresh_token string) error {
 	return nil
 }
 
-type AccessToken struct {
-	Access_token string `json:"access_token"`
-}
-
-func GetAccessToken(client_id string, client_secret string, refresh_token string) (string, error) {
+func GetAccessToken(client_id string, client_secret string, refresh_token string) (structs.AccessToken, error) {
 	auth := client_id + ":" + client_secret
 	encoded_auth := base64.StdEncoding.EncodeToString([]byte(auth))
 
@@ -154,7 +152,7 @@ func GetAccessToken(client_id string, client_secret string, refresh_token string
 	client := http.Client{}
 	req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", req_body)
 	if err != nil {
-		return "", err
+		return structs.AccessToken{}, err
 	}
 	// headers
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -163,7 +161,7 @@ func GetAccessToken(client_id string, client_secret string, refresh_token string
 	// execute request
 	res, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return structs.AccessToken{}, err
 	}
 
 	defer res.Body.Close()
@@ -171,15 +169,15 @@ func GetAccessToken(client_id string, client_secret string, refresh_token string
 	// read request
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", err
+		return structs.AccessToken{}, err
 	}
 
 	// parse json
-	var data AccessToken
+	var data structs.AccessToken
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return "", err
+		return structs.AccessToken{}, err
 	}
 
-	return data.Access_token, nil
+	return data, nil
 }
